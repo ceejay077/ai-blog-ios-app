@@ -1,13 +1,52 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createClient } from '@supabase/supabase-js';
-import Constants from 'expo-constants';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { createClient } from "@supabase/supabase-js";
+import Constants from "expo-constants";
+import { Platform } from "react-native";
 
-const supabaseUrl = Constants.expoConfig?.extra?.EXPO_PUBLIC_SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = Constants.expoConfig?.extra?.EXPO_PUBLIC_SUPABASE_ANON_KEY || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabaseUrl =
+  Constants.expoConfig?.extra?.EXPO_PUBLIC_SUPABASE_URL ||
+  process.env.EXPO_PUBLIC_SUPABASE_URL ||
+  "";
+const supabaseAnonKey =
+  Constants.expoConfig?.extra?.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
+  "";
+
+class SupabaseStorage {
+  getItem(key: string): Promise<string | null> {
+    if (Platform.OS === "web") {
+      if (typeof localStorage !== "undefined") {
+        return Promise.resolve(localStorage.getItem(key));
+      }
+      return Promise.resolve(null);
+    }
+    return AsyncStorage.getItem(key);
+  }
+
+  setItem(key: string, value: string): Promise<void> {
+    if (Platform.OS === "web") {
+      if (typeof localStorage !== "undefined") {
+        localStorage.setItem(key, value);
+      }
+      return Promise.resolve();
+    }
+    return AsyncStorage.setItem(key, value);
+  }
+
+  removeItem(key: string): Promise<void> {
+    if (Platform.OS === "web") {
+      if (typeof localStorage !== "undefined") {
+        localStorage.removeItem(key);
+      }
+      return Promise.resolve();
+    }
+    return AsyncStorage.removeItem(key);
+  }
+}
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    storage: AsyncStorage,
+    storage: new SupabaseStorage(),
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
@@ -37,41 +76,47 @@ export const signOut = async () => {
 };
 
 export const getCurrentUser = async () => {
-  const { data: { session }, error } = await supabase.auth.getSession();
+  const {
+    data: { session },
+    error,
+  } = await supabase.auth.getSession();
   return { session, error };
 };
 
 // User profile functions
 export const getUserProfile = async (userId: string) => {
   const { data, error } = await supabase
-    .from('users')
-    .select('*')
-    .eq('id', userId)
+    .from("users")
+    .select("*")
+    .eq("id", userId)
     .single();
   return { data, error };
 };
 
 export const createUserProfile = async (userId: string, email: string) => {
   const { data, error } = await supabase
-    .from('users')
+    .from("users")
     .insert([
       {
         id: userId,
         email,
         is_premium: false,
         article_count: 0,
-      }
+      },
     ])
     .select()
     .single();
   return { data, error };
 };
 
-export const updateUserPremiumStatus = async (userId: string, isPremium: boolean) => {
+export const updateUserPremiumStatus = async (
+  userId: string,
+  isPremium: boolean
+) => {
   const { data, error } = await supabase
-    .from('users')
+    .from("users")
     .update({ is_premium: isPremium })
-    .eq('id', userId)
+    .eq("id", userId)
     .select()
     .single();
   return { data, error };
@@ -92,7 +137,7 @@ export const createArticle = async (article: {
   payment_status: string;
 }) => {
   const { data, error } = await supabase
-    .from('articles')
+    .from("articles")
     .insert([article])
     .select()
     .single();
@@ -101,35 +146,39 @@ export const createArticle = async (article: {
 
 export const getUserArticles = async (userId: string) => {
   const { data, error } = await supabase
-    .from('articles')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false });
+    .from("articles")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
   return { data, error };
 };
 
 export const getArticleById = async (articleId: string) => {
   const { data, error } = await supabase
-    .from('articles')
-    .select('*')
-    .eq('id', articleId)
+    .from("articles")
+    .select("*")
+    .eq("id", articleId)
     .single();
   return { data, error };
 };
 
 // Image upload function
-export const uploadArticleImage = async (userId: string, imageUri: string, fileName: string) => {
+export const uploadArticleImage = async (
+  userId: string,
+  imageUri: string,
+  fileName: string
+) => {
   try {
     // Fetch the image as blob
     const response = await fetch(imageUri);
     const blob = await response.blob();
-    
+
     const filePath = `${userId}/${Date.now()}-${fileName}`;
-    
+
     const { data, error } = await supabase.storage
-      .from('article-images')
+      .from("article-images")
       .upload(filePath, blob, {
-        contentType: 'image/jpeg',
+        contentType: "image/jpeg",
         upsert: false,
       });
 
@@ -138,9 +187,9 @@ export const uploadArticleImage = async (userId: string, imageUri: string, fileN
     }
 
     // Get public URL
-    const { data: { publicUrl } } = supabase.storage
-      .from('article-images')
-      .getPublicUrl(filePath);
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from("article-images").getPublicUrl(filePath);
 
     return { data: { path: filePath, publicUrl }, error: null };
   } catch (error) {

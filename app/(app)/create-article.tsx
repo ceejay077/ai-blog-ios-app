@@ -1,44 +1,53 @@
-import { useAuth } from '@/contexts/AuthContext';
-import { generateArticle } from '@/lib/anthropic';
-import { createArticle, uploadArticleImage } from '@/lib/supabase';
-import * as ImagePicker from 'expo-image-picker';
-import { router } from 'expo-router';
-import React, { useState } from 'react';
+import { useAuth } from "@/contexts/AuthContext";
+import { generateArticle } from "@/lib/anthropic";
+import { generateSuggestions } from "@/lib/gemini";
+import { createArticle, uploadArticleImage } from "@/lib/supabase";
+import Slider from "@react-native-community/slider";
+import * as ImagePicker from "expo-image-picker";
+import { router } from "expo-router";
+import React, { useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
-} from 'react-native';
+  ActivityIndicator,
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 export default function CreateArticleScreen() {
   const { user, userProfile } = useAuth();
-  const [title, setTitle] = useState('');
-  const [keywords, setKeywords] = useState('');
-  const [targetAudience, setTargetAudience] = useState('');
-  const [tone, setTone] = useState('Professional');
+  const [title, setTitle] = useState("");
+  const [keywords, setKeywords] = useState("");
+  const [targetAudience, setTargetAudience] = useState("");
+  const [category, setCategory] = useState("Technology");
+  const [tone, setTone] = useState("Professional");
   const [imageUri, setImageUri] = useState<string | null>(null);
-  const [imageAltText, setImageAltText] = useState('');
+  const [imageAltText, setImageAltText] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showSuggestionsModal, setShowSuggestionsModal] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [suggestionField, setSuggestionField] = useState<
+    "title" | "keywords" | "audience" | null
+  >(null);
+  const [wordCount, setWordCount] = useState(500);
 
   const isPremium = userProfile?.is_premium || false;
-  const maxWords = isPremium ? 2000 : 500;
+  const maxWords = isPremium ? 2500 : 500;
 
   const pickImage = async () => {
     if (!isPremium) {
       Alert.alert(
-        'Premium Feature',
-        'Image uploads are only available for Premium members. Upgrade to Premium to unlock this feature.',
-        [{ text: 'OK' }]
+        "Premium Feature",
+        "Image uploads are only available for Premium members. Upgrade to Premium to unlock this feature.",
+        [{ text: "OK" }]
       );
       return;
     }
@@ -62,7 +71,10 @@ export default function CreateArticleScreen() {
 
   const handleGenerate = () => {
     if (!title || !keywords || !targetAudience) {
-      Alert.alert('Missing Information', 'Please fill in Title, Keywords, and Target Audience');
+      Alert.alert(
+        "Missing Information",
+        "Please fill in Title, Keywords, and Target Audience"
+      );
       return;
     }
 
@@ -70,15 +82,19 @@ export default function CreateArticleScreen() {
   };
 
   const handleGenerateArticle = async () => {
-    setLoading(true);
+    router.push("/(app)/generating-article");
 
     try {
       let imageUrl = null;
-      
+
       if (imageUri && isPremium && user) {
         const fileName = `article-${Date.now()}.jpg`;
-        const { data, error } = await uploadArticleImage(user.id, imageUri, fileName);
-        
+        const { data, error } = await uploadArticleImage(
+          user.id,
+          imageUri,
+          fileName
+        );
+
         if (data) {
           imageUrl = data.publicUrl;
         }
@@ -89,18 +105,18 @@ export default function CreateArticleScreen() {
         keywords,
         targetAudience,
         tone,
-        maxWords,
+        maxWords: wordCount,
       });
 
       if (result.error) {
-        Alert.alert('Generation Failed', result.error);
+        Alert.alert("Generation Failed", result.error);
         setLoading(false);
         return;
       }
 
       if (!isPremium && result.wordCount > 500) {
         Alert.alert(
-          'Word Limit Exceeded',
+          "Word Limit Exceeded",
           `Your article is ${result.wordCount} words. Free users are limited to 500 words. Upgrade to Premium for unlimited words.`
         );
       }
@@ -117,30 +133,57 @@ export default function CreateArticleScreen() {
           has_image: !!imageUrl,
           image_url: imageUrl || undefined,
           image_alt_text: imageAltText || undefined,
-          payment_status: 'completed',
+          payment_status: "completed",
         });
       }
 
       setLoading(false);
-      
+
       router.push({
-        pathname: '/(app)/article-result',
+        pathname: "/(app)/article-result",
         params: {
           content: result.content,
           title,
           wordCount: result.wordCount.toString(),
         },
       });
-    } catch (error: any) {
+    } catch (error) {
       setLoading(false);
-      Alert.alert('Error', error.message || 'Failed to generate article');
+      Alert.alert("Error", error.message || "Failed to generate article");
     }
+  };
+
+  const handleShowSuggestions = async (
+    field: "title" | "keywords" | "audience"
+  ) => {
+    setSuggestionField(field);
+    setLoading(true);
+    const result = await generateSuggestions(category, field);
+    setLoading(false);
+
+    if (result.error) {
+      Alert.alert("Error", result.error);
+    } else if (result.suggestions) {
+      setSuggestions(result.suggestions);
+      setShowSuggestionsModal(true);
+    }
+  };
+
+  const handleSelectSuggestion = (suggestion: string) => {
+    if (suggestionField === "title") {
+      setTitle(suggestion);
+    } else if (suggestionField === "keywords") {
+      setKeywords(suggestion);
+    } else if (suggestionField === "audience") {
+      setTargetAudience(suggestion);
+    }
+    setShowSuggestionsModal(false);
   };
 
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <ScrollView
         contentContainerStyle={styles.scrollContent}
@@ -149,13 +192,18 @@ export default function CreateArticleScreen() {
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Create Article</Text>
           <Text style={styles.headerSubtitle}>
-            {isPremium ? 'Premium Member' : `Free Tier - ${maxWords} words max`}
+            {isPremium ? "Premium Member" : `Free Tier - ${maxWords} words max`}
           </Text>
         </View>
 
         <View style={styles.form}>
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Article Title *</Text>
+            <View style={styles.labelRow}>
+              <Text style={styles.label}>Article Title *</Text>
+              <TouchableOpacity onPress={() => handleShowSuggestions("title")}>
+                <Text style={styles.suggestionButton}>💡</Text>
+              </TouchableOpacity>
+            </View>
             <TextInput
               style={styles.input}
               placeholder="Enter your article title"
@@ -167,7 +215,39 @@ export default function CreateArticleScreen() {
           </View>
 
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Target Keywords *</Text>
+            <Text style={styles.label}>Category *</Text>
+            <View style={styles.toneButtons}>
+              {["Technology", "Health", "Business", "Travel"].map((c) => (
+                <TouchableOpacity
+                  key={c}
+                  style={[
+                    styles.toneButton,
+                    category === c && styles.toneButtonActive,
+                  ]}
+                  onPress={() => setCategory(c)}
+                >
+                  <Text
+                    style={[
+                      styles.toneButtonText,
+                      category === c && styles.toneButtonTextActive,
+                    ]}
+                  >
+                    {c}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.inputContainer}>
+            <View style={styles.labelRow}>
+              <Text style={styles.label}>Target Keywords *</Text>
+              <TouchableOpacity
+                onPress={() => handleShowSuggestions("keywords")}
+              >
+                <Text style={styles.suggestionButton}>💡</Text>
+              </TouchableOpacity>
+            </View>
             <TextInput
               style={styles.input}
               placeholder="e.g., SEO, content marketing, blog writing"
@@ -179,7 +259,14 @@ export default function CreateArticleScreen() {
           </View>
 
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Target Audience *</Text>
+            <View style={styles.labelRow}>
+              <Text style={styles.label}>Target Audience *</Text>
+              <TouchableOpacity
+                onPress={() => handleShowSuggestions("audience")}
+              >
+                <Text style={styles.suggestionButton}>💡</Text>
+              </TouchableOpacity>
+            </View>
             <TextInput
               style={styles.input}
               placeholder="e.g., Digital marketers, small business owners"
@@ -191,27 +278,43 @@ export default function CreateArticleScreen() {
           </View>
 
           <View style={styles.inputContainer}>
+            <Text style={styles.label}>Word Count</Text>
+            <Slider
+              style={{ width: "100%", height: 40 }}
+              minimumValue={500}
+              maximumValue={2500}
+              step={100}
+              value={wordCount}
+              onValueChange={setWordCount}
+              disabled={!isPremium}
+            />
+            <Text style={styles.wordCountText}>{wordCount} words</Text>
+          </View>
+
+          <View style={styles.inputContainer}>
             <Text style={styles.label}>Tone (Optional)</Text>
             <View style={styles.toneButtons}>
-              {['Professional', 'Casual', 'Friendly', 'Authoritative'].map((t) => (
-                <TouchableOpacity
-                  key={t}
-                  style={[
-                    styles.toneButton,
-                    tone === t && styles.toneButtonActive,
-                  ]}
-                  onPress={() => setTone(t)}
-                >
-                  <Text
+              {["Professional", "Casual", "Friendly", "Authoritative"].map(
+                (t) => (
+                  <TouchableOpacity
+                    key={t}
                     style={[
-                      styles.toneButtonText,
-                      tone === t && styles.toneButtonTextActive,
+                      styles.toneButton,
+                      tone === t && styles.toneButtonActive,
                     ]}
+                    onPress={() => setTone(t)}
                   >
-                    {t}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+                    <Text
+                      style={[
+                        styles.toneButtonText,
+                        tone === t && styles.toneButtonTextActive,
+                      ]}
+                    >
+                      {t}
+                    </Text>
+                  </TouchableOpacity>
+                )
+              )}
             </View>
           </View>
 
@@ -235,7 +338,7 @@ export default function CreateArticleScreen() {
                 <Image source={{ uri: imageUri }} style={styles.imagePreview} />
               ) : (
                 <Text style={styles.imageButtonText}>
-                  {isPremium ? '📷 Choose Image' : '🔒 Premium Feature'}
+                  {isPremium ? "📷 Choose Image" : "🔒 Premium Feature"}
                 </Text>
               )}
             </TouchableOpacity>
@@ -251,7 +354,10 @@ export default function CreateArticleScreen() {
           </View>
 
           <TouchableOpacity
-            style={[styles.generateButton, loading && styles.generateButtonDisabled]}
+            style={[
+              styles.generateButton,
+              loading && styles.generateButtonDisabled,
+            ]}
             onPress={handleGenerate}
             disabled={loading}
           >
@@ -260,7 +366,6 @@ export default function CreateArticleScreen() {
             ) : (
               <>
                 <Text style={styles.generateButtonText}>Generate Article</Text>
-                <Text style={styles.generateButtonPrice}>$4.99</Text>
               </>
             )}
           </TouchableOpacity>
@@ -268,13 +373,13 @@ export default function CreateArticleScreen() {
           <View style={styles.navigation}>
             <TouchableOpacity
               style={styles.navButton}
-              onPress={() => router.push('/(app)/history')}
+              onPress={() => router.push("/(app)/history")}
             >
               <Text style={styles.navButtonText}>📚 History</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.navButton}
-              onPress={() => router.push('/(app)/profile')}
+              onPress={() => router.push("/(app)/profile")}
             >
               <Text style={styles.navButtonText}>⚙️ Profile</Text>
             </TouchableOpacity>
@@ -290,15 +395,38 @@ export default function CreateArticleScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Confirm Purchase</Text>
-            <Text style={styles.modalText}>
-              Generate this article for $4.99?
-            </Text>
-            <Text style={styles.modalDetails}>
-              • SEO-optimized content{'\n'}
-              • Up to {maxWords} words{'\n'}
-              • Instant generation
-            </Text>
+            <Text style={styles.modalTitle}>Confirm Generation</Text>
+            {isPremium ? (
+              <>
+                <Text style={styles.modalText}>
+                  Please confirm the details for your article:
+                </Text>
+                <Text style={styles.modalDetails}>
+                  • Title: {title}
+                  {"\n"}• Keywords: {keywords}
+                  {"\n"}• Audience: {targetAudience}
+                  {"\n"}• Word Count: {wordCount}
+                </Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.modalText}>
+                  Only 500 words can be generated in your free plan.
+                </Text>
+                <Text style={styles.modalDetails}>
+                  Upgrade to the premium plan to unlock:
+                  {"\n"}• Up to 2500 words
+                  {"\n"}• Image uploads with alt text
+                  {"\n"}• Priority API requests (faster response)
+                  {"\n"}• 5 regenerates
+                </Text>
+                <Text style={styles.modalDetails}>
+                  • Title: {title}
+                  {"\n"}• Keywords: {keywords}
+                  {"\n"}• Audience: {targetAudience}
+                </Text>
+              </>
+            )}
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={styles.modalButtonCancel}
@@ -316,6 +444,34 @@ export default function CreateArticleScreen() {
           </View>
         </View>
       </Modal>
+
+      <Modal
+        visible={showSuggestionsModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowSuggestionsModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Suggestions</Text>
+            {suggestions.map((suggestion, index) => (
+              <TouchableOpacity
+                key={index}
+                style={styles.suggestionItem}
+                onPress={() => handleSelectSuggestion(suggestion)}
+              >
+                <Text style={styles.suggestionText}>{suggestion}</Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity
+              style={styles.modalButtonCancel}
+              onPress={() => setShowSuggestionsModal(false)}
+            >
+              <Text style={styles.modalButtonCancelText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -323,7 +479,7 @@ export default function CreateArticleScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
   },
   scrollContent: {
     padding: 20,
@@ -335,33 +491,37 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 32,
-    fontWeight: 'bold',
-    color: '#000000',
+    fontWeight: "bold",
+    color: "#000000",
     marginBottom: 5,
   },
   headerSubtitle: {
     fontSize: 14,
-    color: '#666666',
+    color: "#666666",
   },
   form: {
-    width: '100%',
+    width: "100%",
   },
   inputContainer: {
     marginBottom: 20,
   },
   labelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 8,
   },
   label: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#333333',
+    fontWeight: "600",
+    color: "#333333",
     marginBottom: 8,
   },
+  suggestionButton: {
+    fontSize: 20,
+    marginLeft: 10,
+  },
   premiumBadge: {
-    backgroundColor: '#FFD700',
+    backgroundColor: "#FFD700",
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 4,
@@ -369,57 +529,57 @@ const styles = StyleSheet.create({
   },
   premiumBadgeText: {
     fontSize: 10,
-    fontWeight: 'bold',
-    color: '#000000',
+    fontWeight: "bold",
+    color: "#000000",
   },
   input: {
-    backgroundColor: '#F5F5F5',
+    backgroundColor: "#F5F5F5",
     borderRadius: 10,
     paddingHorizontal: 15,
     paddingVertical: 12,
     fontSize: 16,
-    color: '#000000',
+    color: "#000000",
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: "#E0E0E0",
     minHeight: 50,
   },
   altTextInput: {
     marginTop: 10,
   },
   toneButtons: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 10,
   },
   toneButton: {
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 8,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: "#F5F5F5",
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: "#E0E0E0",
   },
   toneButtonActive: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
+    backgroundColor: "#007AFF",
+    borderColor: "#007AFF",
   },
   toneButtonText: {
     fontSize: 14,
-    color: '#333333',
-    fontWeight: '500',
+    color: "#333333",
+    fontWeight: "500",
   },
   toneButtonTextActive: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
   },
   imageButton: {
-    backgroundColor: '#F5F5F5',
+    backgroundColor: "#F5F5F5",
     borderRadius: 10,
     padding: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     borderWidth: 2,
-    borderColor: '#E0E0E0',
-    borderStyle: 'dashed',
+    borderColor: "#E0E0E0",
+    borderStyle: "dashed",
     minHeight: 150,
   },
   imageButtonDisabled: {
@@ -427,22 +587,22 @@ const styles = StyleSheet.create({
   },
   imageButtonText: {
     fontSize: 16,
-    color: '#666666',
+    color: "#666666",
   },
   imagePreview: {
-    width: '100%',
+    width: "100%",
     height: 150,
     borderRadius: 8,
   },
   generateButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: "#007AFF",
     borderRadius: 12,
     paddingVertical: 18,
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: 20,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    shadowColor: '#000',
+    flexDirection: "row",
+    justifyContent: "center",
+    shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: 2,
@@ -455,91 +615,105 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   generateButtonText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: "600",
     marginRight: 10,
   },
   generateButtonPrice: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   navigation: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
+    flexDirection: "row",
+    justifyContent: "space-around",
     marginTop: 30,
   },
   navButton: {
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 8,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: "#F5F5F5",
   },
   navButtonText: {
     fontSize: 16,
-    color: '#333333',
-    fontWeight: '500',
+    color: "#333333",
+    fontWeight: "500",
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
     padding: 20,
   },
   modalContent: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderRadius: 16,
     padding: 30,
-    width: '100%',
+    width: "100%",
     maxWidth: 400,
   },
   modalTitle: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#000000',
+    fontWeight: "bold",
+    color: "#000000",
     marginBottom: 10,
-    textAlign: 'center',
+    textAlign: "center",
   },
   modalText: {
     fontSize: 16,
-    color: '#666666',
-    textAlign: 'center',
+    color: "#666666",
+    textAlign: "center",
     marginBottom: 20,
   },
   modalDetails: {
     fontSize: 14,
-    color: '#333333',
+    color: "#333333",
     marginBottom: 30,
     lineHeight: 22,
   },
   modalButtons: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 10,
   },
   modalButtonCancel: {
     flex: 1,
     paddingVertical: 14,
     borderRadius: 10,
-    backgroundColor: '#F5F5F5',
-    alignItems: 'center',
+    backgroundColor: "#F5F5F5",
+    alignItems: "center",
   },
   modalButtonCancelText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#666666',
+    fontWeight: "600",
+    color: "#666666",
   },
   modalButtonConfirm: {
     flex: 1,
     paddingVertical: 14,
     borderRadius: 10,
-    backgroundColor: '#007AFF',
-    alignItems: 'center',
+    backgroundColor: "#007AFF",
+    alignItems: "center",
   },
   modalButtonConfirmText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    fontWeight: "600",
+    color: "#FFFFFF",
+  },
+  suggestionItem: {
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E0E0E0",
+  },
+  suggestionText: {
+    fontSize: 16,
+  },
+  wordCountText: {
+    textAlign: "center",
+    marginTop: 10,
+    fontSize: 16,
+    color: "#666",
   },
 });

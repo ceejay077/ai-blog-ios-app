@@ -1,15 +1,21 @@
-import { useAuth } from '@/contexts/AuthContext';
-import { router } from 'expo-router';
-import React, { useEffect } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useAuth } from "@/contexts/AuthContext";
+import { router } from "expo-router";
+import React, { useEffect } from "react";
+import {
+  ActivityIndicator,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 export default function WelcomeScreen() {
   const { user, loading } = useAuth();
 
   useEffect(() => {
     if (!loading && user) {
-      // If user is logged in, navigate to app
-      router.replace('/(app)/create-article');
+      // If user is logged in, navigate to main page (tabs)
+      setTimeout(() => router.replace("/(tabs)"), 0);
     }
   }, [user, loading]);
 
@@ -29,7 +35,7 @@ export default function WelcomeScreen() {
           <Text style={styles.logoText}>SEO Article</Text>
           <Text style={styles.logoTextSecondary}>Generator</Text>
         </View>
-        
+
         <Text style={styles.tagline}>
           Create Professional, SEO-Optimized Blog Articles with AI
         </Text>
@@ -49,16 +55,14 @@ export default function WelcomeScreen() {
           </View>
         </View>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.startButton}
-          onPress={() => router.push('/(auth)/login')}
+          onPress={() => router.push("/(auth)/login")}
         >
           <Text style={styles.startButtonText}>Get Started</Text>
         </TouchableOpacity>
 
-        <Text style={styles.footerText}>
-          Powered by Anthropic Claude AI
-        </Text>
+        <Text style={styles.footerText}>Powered by Anthropic Claude AI</Text>
       </View>
     </View>
   );
@@ -67,16 +71,16 @@ export default function WelcomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
   },
   content: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingHorizontal: 30,
   },
   logoContainer: {
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 30,
   },
   logoIcon: {
@@ -85,31 +89,31 @@ const styles = StyleSheet.create({
   },
   logoText: {
     fontSize: 36,
-    fontWeight: 'bold',
-    color: '#000000',
+    fontWeight: "bold",
+    color: "#000000",
     letterSpacing: 1,
   },
   logoTextSecondary: {
     fontSize: 28,
-    fontWeight: '600',
-    color: '#007AFF',
+    fontWeight: "600",
+    color: "#007AFF",
     marginTop: -5,
   },
   tagline: {
     fontSize: 18,
-    color: '#666666',
-    textAlign: 'center',
+    color: "#666666",
+    textAlign: "center",
     marginBottom: 40,
     lineHeight: 26,
     maxWidth: 320,
   },
   features: {
-    width: '100%',
+    width: "100%",
     marginBottom: 50,
   },
   featureItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 20,
     paddingHorizontal: 20,
   },
@@ -119,15 +123,15 @@ const styles = StyleSheet.create({
   },
   featureText: {
     fontSize: 16,
-    color: '#333333',
-    fontWeight: '500',
+    color: "#333333",
+    fontWeight: "500",
   },
   startButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: "#007AFF",
     paddingVertical: 16,
     paddingHorizontal: 60,
     borderRadius: 12,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: 2,
@@ -137,14 +141,14 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   startButtonText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   footerText: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 30,
     fontSize: 12,
-    color: '#999999',
+    color: "#999999",
   },
 });

@@ -1,6 +1,7 @@
-import { createUserProfile, getUserProfile, supabase } from '@/lib/supabase';
-import { Session, User } from '@supabase/supabase-js';
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import { createUserProfile, getUserProfile, supabase } from "@/lib/supabase";
+import { Session, User } from "@supabase/supabase-js";
+import * as SecureStore from "expo-secure-store";
+import React, { createContext, useContext, useEffect, useState } from "react";
 
 interface UserProfile {
   id: string;
@@ -35,38 +36,50 @@ const AuthContext = createContext<AuthContextType>({
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 };
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+const SESSION_KEY = "supabase_session";
+
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check active sessions
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        loadUserProfile(session.user.id);
-      } else {
-        setLoading(false);
+    const loadSession = async () => {
+      const savedSession = await SecureStore.getItemAsync(SESSION_KEY);
+      if (savedSession) {
+        const parsedSession = JSON.parse(savedSession);
+        setSession(parsedSession);
+        setUser(parsedSession.user ?? null);
+        if (parsedSession.user) {
+          await loadUserProfile(parsedSession.user.id);
+        }
       }
-    });
+      setLoading(false);
+    };
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    loadSession();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
-      if (session?.user) {
-        loadUserProfile(session.user.id);
+      if (session) {
+        SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(session));
+        if (session.user) {
+          loadUserProfile(session.user.id);
+        }
       } else {
+        SecureStore.deleteItemAsync(SESSION_KEY);
         setUserProfile(null);
-        setLoading(false);
       }
     });
 
@@ -80,9 +93,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUserProfile(data);
       }
     } catch (error) {
-      console.error('Error loading user profile:', error);
-    } finally {
-      setLoading(false);
+      console.error("Error loading user profile:", error);
     }
   };
 
@@ -124,9 +135,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
-    setUser(null);
-    setUserProfile(null);
-    setSession(null);
   };
 
   return (

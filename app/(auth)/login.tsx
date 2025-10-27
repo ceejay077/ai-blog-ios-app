@@ -1,28 +1,28 @@
-import { useAuth } from '@/contexts/AuthContext';
-import { router } from 'expo-router';
-import React, { useState } from 'react';
+import { useAuth } from "@/contexts/AuthContext";
+import { router } from "expo-router";
+import React, { useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
-} from 'react-native';
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 export default function LoginScreen() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const { signIn } = useAuth();
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
+      Alert.alert("Error", "Please fill in all fields");
       return;
     }
 
@@ -31,16 +31,16 @@ export default function LoginScreen() {
     setLoading(false);
 
     if (error) {
-      Alert.alert('Login Failed', error.message || 'Invalid credentials');
+      Alert.alert("Login Failed", error.message || "Invalid credentials");
     } else {
-      router.replace('/(app)/create-article');
+      router.replace("/(tabs)");
     }
   };
 
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <ScrollView
         contentContainerStyle={styles.scrollContent}
@@ -49,7 +49,9 @@ export default function LoginScreen() {
         <View style={styles.header}>
           <Text style={styles.icon}>📝</Text>
           <Text style={styles.title}>Welcome Back</Text>
-          <Text style={styles.subtitle}>Sign in to continue generating articles</Text>
+          <Text style={styles.subtitle}>
+            Sign in to continue generating articles
+          </Text>
         </View>
 
         <View style={styles.form}>
@@ -94,7 +96,7 @@ export default function LoginScreen() {
 
           <View style={styles.signupContainer}>
             <Text style={styles.signupText}>Don't have an account? </Text>
-            <TouchableOpacity onPress={() => router.push('/(auth)/signup')}>
+            <TouchableOpacity onPress={() => router.push("/(auth)/signup")}>
               <Text style={styles.signupLink}>Sign Up</Text>
             </TouchableOpacity>
           </View>
@@ -107,16 +109,16 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
   },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
     paddingHorizontal: 30,
     paddingVertical: 40,
   },
   header: {
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 50,
   },
   icon: {
@@ -125,44 +127,44 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 32,
-    fontWeight: 'bold',
-    color: '#000000',
+    fontWeight: "bold",
+    color: "#000000",
     marginBottom: 10,
   },
   subtitle: {
     fontSize: 16,
-    color: '#666666',
-    textAlign: 'center',
+    color: "#666666",
+    textAlign: "center",
   },
   form: {
-    width: '100%',
+    width: "100%",
   },
   inputContainer: {
     marginBottom: 20,
   },
   label: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#333333',
+    fontWeight: "600",
+    color: "#333333",
     marginBottom: 8,
   },
   input: {
-    backgroundColor: '#F5F5F5',
+    backgroundColor: "#F5F5F5",
     borderRadius: 10,
     paddingHorizontal: 15,
     paddingVertical: 15,
     fontSize: 16,
-    color: '#000000',
+    color: "#000000",
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: "#E0E0E0",
   },
   loginButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: "#007AFF",
     borderRadius: 10,
     paddingVertical: 16,
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: 10,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: 2,
@@ -175,22 +177,22 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   loginButtonText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   signupContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
+    flexDirection: "row",
+    justifyContent: "center",
     marginTop: 30,
   },
   signupText: {
     fontSize: 14,
-    color: '#666666',
+    color: "#666666",
   },
   signupLink: {
     fontSize: 14,
-    color: '#007AFF',
-    fontWeight: '600',
+    color: "#007AFF",
+    fontWeight: "600",
   },
 });

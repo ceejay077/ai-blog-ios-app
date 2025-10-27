@@ -1,98 +1,325 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import {
+  fetchTrendingFeedWithRetry,
+  TrendingArticle,
+} from "@/lib/trending-feed";
+import { LinearGradient } from "expo-linear-gradient";
+import React, { useCallback, useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Dimensions,
+  FlatList,
+  Image,
+  Linking,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { Button, Card, Chip } from "react-native-paper";
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+const { width } = Dimensions.get("window");
 
 export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+  const [articles, setArticles] = useState<TrendingArticle[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+  const loadFeed = async (isRefresh = false) => {
+    try {
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+      setError(null);
+
+      const feed = await fetchTrendingFeedWithRetry();
+      setArticles(feed);
+    } catch (err) {
+      setError("Failed to load trending feed. Pull down to retry.");
+      console.error("Error loading feed:", err);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    loadFeed();
+  }, []);
+
+  const onRefresh = useCallback(() => {
+    loadFeed(true);
+  }, []);
+
+  const handleArticlePress = (url: string) => {
+    Linking.openURL(url).catch((err) =>
+      console.error("Failed to open link:", err)
+    );
+  };
+
+  const renderArticle = ({
+    item,
+    index,
+  }: {
+    item: TrendingArticle;
+    index: number;
+  }) => (
+    <Card style={styles.card} elevation={3}>
+      <TouchableOpacity
+        activeOpacity={0.9}
+        onPress={() => handleArticlePress(item.url)}
+      >
+        <View style={styles.imageContainer}>
+          <Image
+            source={{ uri: item.imageUrl }}
+            style={styles.image}
+            resizeMode="cover"
+          />
+          <LinearGradient
+            colors={["transparent", "rgba(0,0,0,0.7)"]}
+            style={styles.imageGradient}
+          />
+          <View style={styles.topicChipContainer}>
+            <Chip style={styles.topicChip} textStyle={styles.topicChipText}>
+              {item.topic}
+            </Chip>
+          </View>
+        </View>
+
+        <View style={styles.contentContainer}>
+          <Text style={styles.title} numberOfLines={3}>
+            {item.title}
+          </Text>
+
+          <Text style={styles.description} numberOfLines={2}>
+            {item.description}
+          </Text>
+
+          <View style={styles.metaContainer}>
+            <Text style={styles.source}>{item.source}</Text>
+            <Text style={styles.dot}>•</Text>
+            <Text style={styles.time}>{formatTime(item.publishedAt)}</Text>
+          </View>
+
+          <Button
+            mode="contained"
+            onPress={() => handleArticlePress(item.url)}
+            style={styles.readMoreButton}
+            labelStyle={styles.readMoreButtonText}
+          >
+            Read More
+          </Button>
+        </View>
+      </TouchableOpacity>
+    </Card>
+  );
+
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
+  };
+
+  if (loading) {
+    return (
+      <LinearGradient
+        colors={["#667eea", "#764ba2"]}
+        style={styles.loadingContainer}
+      >
+        <ActivityIndicator size="large" color="#ffffff" />
+        <Text style={styles.loadingText}>Loading trending stories...</Text>
+      </LinearGradient>
+    );
+  }
+
+  if (error && articles.length === 0) {
+    return (
+      <LinearGradient
+        colors={["#667eea", "#764ba2"]}
+        style={styles.errorContainer}
+      >
+        <Text style={styles.errorText}>{error}</Text>
+        <Button
+          mode="contained"
+          onPress={() => loadFeed()}
+          style={styles.retryButton}
+          labelStyle={styles.retryButtonText}
+        >
+          Retry
+        </Button>
+      </LinearGradient>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <LinearGradient colors={["#667eea", "#764ba2"]} style={styles.header}>
+        <Text style={styles.headerTitle}>Discover</Text>
+        <Text style={styles.headerSubtitle}>Trending stories just for you</Text>
+      </LinearGradient>
+
+      <FlatList
+        data={articles}
+        renderItem={renderArticle}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.listContainer}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#667eea"
+            colors={["#667eea", "#764ba2"]}
+          />
+        }
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: {
+    flex: 1,
+    backgroundColor: "#f5f7fa",
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
+  loadingText: {
+    color: "#ffffff",
+    fontSize: 16,
+    marginTop: 16,
+    fontWeight: "500",
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  errorText: {
+    color: "#ffffff",
+    fontSize: 16,
+    textAlign: "center",
+    marginBottom: 20,
+    fontWeight: "500",
+  },
+  retryButton: {
+    backgroundColor: "#ffffff",
+    paddingHorizontal: 20,
+  },
+  retryButtonText: {
+    color: "#667eea",
+    fontWeight: "bold",
+  },
+  header: {
+    paddingTop: 60,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+  },
+  headerTitle: {
+    fontSize: 32,
+    fontWeight: "bold",
+    color: "#ffffff",
+    marginBottom: 4,
+  },
+  headerSubtitle: {
+    fontSize: 16,
+    color: "rgba(255,255,255,0.9)",
+  },
+  listContainer: {
+    padding: 16,
+  },
+  card: {
+    marginBottom: 20,
+    borderRadius: 16,
+    overflow: "hidden",
+    backgroundColor: "#ffffff",
+  },
+  imageContainer: {
+    position: "relative",
+    height: 220,
+    width: "100%",
+  },
+  image: {
+    width: "100%",
+    height: "100%",
+  },
+  imageGradient: {
+    position: "absolute",
     bottom: 0,
     left: 0,
-    position: 'absolute',
+    right: 0,
+    height: "50%",
+  },
+  topicChipContainer: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+  },
+  topicChip: {
+    backgroundColor: "rgba(102, 126, 234, 0.95)",
+  },
+  topicChipText: {
+    color: "#ffffff",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  contentContainer: {
+    padding: 16,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#1a202c",
+    marginBottom: 8,
+    lineHeight: 28,
+  },
+  description: {
+    fontSize: 14,
+    color: "#4a5568",
+    marginBottom: 12,
+    lineHeight: 20,
+  },
+  metaContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  source: {
+    fontSize: 13,
+    color: "#667eea",
+    fontWeight: "600",
+  },
+  dot: {
+    fontSize: 13,
+    color: "#a0aec0",
+    marginHorizontal: 6,
+  },
+  time: {
+    fontSize: 13,
+    color: "#a0aec0",
+  },
+  readMoreButton: {
+    backgroundColor: "#667eea",
+    borderRadius: 8,
+  },
+  readMoreButtonText: {
+    color: "#ffffff",
+    fontWeight: "600",
+    fontSize: 14,
   },
 });
