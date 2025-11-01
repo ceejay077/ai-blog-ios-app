@@ -1,7 +1,9 @@
+import { generateRecommendedTitleGemini } from "@/lib/gemini";
 import {
   fetchTrendingFeedWithRetry,
   TrendingArticle,
 } from "@/lib/trending-feed";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useEffect, useState } from "react";
 import {
@@ -20,11 +22,14 @@ import { Button, Card, Chip } from "react-native-paper";
 
 const { width } = Dimensions.get("window");
 
+const CATEGORIES_STORAGE_KEY = "user_selected_categories";
+
 export default function HomeScreen() {
   const [articles, setArticles] = useState<TrendingArticle[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
 
   const loadFeed = async (isRefresh = false) => {
     try {
@@ -35,8 +40,20 @@ export default function HomeScreen() {
       }
       setError(null);
 
-      const feed = await fetchTrendingFeedWithRetry();
-      setArticles(feed);
+      let feed = await fetchTrendingFeedWithRetry(selectedCategories);
+
+      // Generate recommended titles for each article
+      const articlesWithRecommendedTitles = await Promise.all(
+        feed.map(async (article) => {
+          const recommendedTitle = await generateRecommendedTitleGemini(
+            article.title,
+            article.category
+          );
+          return { ...article, recommendedTitle };
+        })
+      );
+
+      setArticles(articlesWithRecommendedTitles);
     } catch (err) {
       setError("Failed to load trending feed. Pull down to retry.");
       console.error("Error loading feed:", err);
@@ -47,12 +64,35 @@ export default function HomeScreen() {
   };
 
   useEffect(() => {
-    loadFeed();
+    const loadSelectedCategories = async () => {
+      try {
+        const storedCategories = await AsyncStorage.getItem(
+          CATEGORIES_STORAGE_KEY
+        );
+        if (storedCategories) {
+          setSelectedCategories(JSON.parse(storedCategories));
+        }
+      } catch (error) {
+        console.error(
+          "Failed to load selected categories from storage:",
+          error
+        );
+      }
+    };
+
+    loadSelectedCategories();
   }, []);
+
+  useEffect(() => {
+    if (selectedCategories.length > 0 || !loading) {
+      // Only load feed once categories are loaded or if it's not the initial load
+      loadFeed();
+    }
+  }, [selectedCategories]); // Reload feed when selectedCategories change
 
   const onRefresh = useCallback(() => {
     loadFeed(true);
-  }, []);
+  }, [selectedCategories]);
 
   const handleArticlePress = (url: string) => {
     Linking.openURL(url).catch((err) =>
@@ -91,7 +131,7 @@ export default function HomeScreen() {
 
         <View style={styles.contentContainer}>
           <Text style={styles.title} numberOfLines={3}>
-            {item.title}
+            {item.recommendedTitle || item.title}
           </Text>
 
           <Text style={styles.description} numberOfLines={2}>

@@ -1,7 +1,9 @@
 import { createUserProfile, getUserProfile, supabase } from "@/lib/supabase";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Session, User } from "@supabase/supabase-js";
 import * as SecureStore from "expo-secure-store";
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { Platform } from "react-native";
 
 interface UserProfile {
   id: string;
@@ -43,6 +45,9 @@ export const useAuth = () => {
 
 const SESSION_KEY = "supabase_session";
 
+// Use AsyncStorage for web, SecureStore for native
+const Storage = Platform.OS === "web" ? AsyncStorage : SecureStore;
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
@@ -53,7 +58,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   useEffect(() => {
     const loadSession = async () => {
-      const savedSession = await SecureStore.getItemAsync(SESSION_KEY);
+      const savedSession = await Storage.getItem(SESSION_KEY);
       if (savedSession) {
         const parsedSession = JSON.parse(savedSession);
         setSession(parsedSession);
@@ -73,12 +78,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setSession(session);
       setUser(session?.user ?? null);
       if (session) {
-        SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(session));
+        Storage.setItem(SESSION_KEY, JSON.stringify(session));
         if (session.user) {
           loadUserProfile(session.user.id);
         }
       } else {
-        SecureStore.deleteItemAsync(SESSION_KEY);
+        if (Platform.OS === "web") {
+          AsyncStorage.removeItem(SESSION_KEY);
+        } else {
+          SecureStore.deleteItemAsync(SESSION_KEY);
+        }
         setUserProfile(null);
       }
     });

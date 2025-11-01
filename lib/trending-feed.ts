@@ -16,6 +16,8 @@ export interface TrendingArticle {
   imageUrl: string;
   publishedAt: string;
   topic: string;
+  recommendedTitle?: string; // Optional AI-generated recommended title
+  category: string; // Added category property
 }
 
 // Demo data for when API keys are missing
@@ -31,6 +33,7 @@ const DEMO_DATA: TrendingArticle[] = [
       "https://images.unsplash.com/photo-1518770660439-4636190af475?w=800",
     publishedAt: new Date().toISOString(),
     topic: "Technology",
+    category: "Technology",
   },
   {
     id: "demo-2",
@@ -43,6 +46,7 @@ const DEMO_DATA: TrendingArticle[] = [
       "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=800",
     publishedAt: new Date(Date.now() - 3600000).toISOString(),
     topic: "Business",
+    category: "Business",
   },
   {
     id: "demo-3",
@@ -55,6 +59,7 @@ const DEMO_DATA: TrendingArticle[] = [
       "https://images.unsplash.com/photo-1569163139394-de4798aa62b3?w=800",
     publishedAt: new Date(Date.now() - 7200000).toISOString(),
     topic: "Environment",
+    category: "Environment",
   },
   {
     id: "demo-4",
@@ -67,6 +72,7 @@ const DEMO_DATA: TrendingArticle[] = [
       "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=800",
     publishedAt: new Date(Date.now() - 10800000).toISOString(),
     topic: "Health",
+    category: "Health",
   },
   {
     id: "demo-5",
@@ -79,6 +85,7 @@ const DEMO_DATA: TrendingArticle[] = [
       "https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?w=800",
     publishedAt: new Date(Date.now() - 14400000).toISOString(),
     topic: "Science",
+    category: "Science",
   },
 ];
 
@@ -142,7 +149,10 @@ const fetchImageForQuery = async (query: string): Promise<string> => {
 };
 
 // Main function to fetch trending feed
-export const fetchTrendingFeed = async (): Promise<TrendingArticle[]> => {
+export const fetchTrendingFeed = async (
+  selectedCategories: string[] = []
+): Promise<TrendingArticle[]> => {
+  console.log("fetchTrendingFeed called with categories:", selectedCategories);
   // If API keys are missing, return demo data
   if (!GNEWS_API_KEY || !UNSPLASH_ACCESS_KEY) {
     console.log("API keys missing. Returning demo data.");
@@ -150,18 +160,34 @@ export const fetchTrendingFeed = async (): Promise<TrendingArticle[]> => {
   }
 
   try {
-    // Step 1: Get trending topics
-    const topics = await getTrendingTopics();
+    // Step 1: Determine topics based on selected categories
+    let topicsToFetch: string[];
+    if (selectedCategories.length > 0) {
+      topicsToFetch = selectedCategories;
+    } else {
+      // Fallback to default topics if no categories are selected
+      topicsToFetch = [
+        "Technology",
+        "Business",
+        "Health",
+        "Science",
+        "Entertainment",
+      ];
+    }
+    console.log("Topics to fetch:", topicsToFetch);
 
-    // Step 2: Fetch articles for each topic
+    // Step 2: Fetch articles for each topic/category
     const allArticles: TrendingArticle[] = [];
 
-    for (const topic of topics) {
+    for (const topic of topicsToFetch) {
+      console.log("Fetching articles for topic:", topic);
       const articles = await fetchArticlesForTopic(topic);
+      console.log(`Found ${articles.length} articles for topic "${topic}"`);
 
       for (const article of articles) {
         // Step 3: Fetch image for each article
         const imageUrl = await fetchImageForQuery(article.title);
+        console.log(`Fetched image for article "${article.title}"`);
 
         allArticles.push({
           id: `${topic}-${article.title}-${Date.now()}`,
@@ -172,13 +198,14 @@ export const fetchTrendingFeed = async (): Promise<TrendingArticle[]> => {
           imageUrl,
           publishedAt: article.publishedAt,
           topic,
+          category: topic, // Assign the topic as the category
         });
       }
 
       // Small delay to avoid rate limiting
       await new Promise((resolve) => setTimeout(resolve, 200));
     }
-
+    console.log("Total articles fetched:", allArticles.length);
     return allArticles;
   } catch (error) {
     console.error("Error building trending feed:", error);
@@ -189,13 +216,14 @@ export const fetchTrendingFeed = async (): Promise<TrendingArticle[]> => {
 
 // Retry mechanism for failed requests
 export const fetchTrendingFeedWithRetry = async (
+  selectedCategories: string[] = [],
   maxRetries = 3
 ): Promise<TrendingArticle[]> => {
   let lastError: any;
 
   for (let i = 0; i < maxRetries; i++) {
     try {
-      const feed = await fetchTrendingFeed();
+      const feed = await fetchTrendingFeed(selectedCategories);
       if (feed.length > 0) {
         return feed;
       }

@@ -70,3 +70,45 @@ export const getTrendingTopics = async (category: string) => {
     };
   }
 };
+
+export const generateRecommendedTitleGemini = async (
+  originalTitle: string,
+  category: string
+): Promise<string> => {
+  console.log("generateRecommendedTitleGemini called for:", {
+    originalTitle,
+    category,
+  });
+  if (!API_KEY) {
+    console.warn(
+      "Gemini API key is missing. Cannot generate recommended title."
+    );
+    return `Recommended: ${originalTitle}`; // Fallback
+  }
+
+  try {
+    const model = genAI.getGenerativeModel({
+      model: "gemini-1.5-flash-latest", // Or another suitable Gemini model
+    });
+
+    const prompt = `Given the article title "${originalTitle}" and its category "${category}", suggest a more engaging and concise recommended title (max 10 words). Respond with only the new title.`;
+    console.log("Gemini prompt:", prompt);
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+    console.log("Gemini API raw response text:", text);
+
+    let recommendedTitle = `Recommended: ${originalTitle}`; // Default fallback
+    if (text) {
+      recommendedTitle = text.trim();
+    }
+    console.log("Generated recommended title:", recommendedTitle);
+    return recommendedTitle.startsWith("Recommended: ")
+      ? recommendedTitle
+      : `Recommended: ${recommendedTitle}`;
+  } catch (error) {
+    console.error("Error generating recommended title with Gemini API:", error);
+    return `Recommended: ${originalTitle}`; // Fallback on error
+  }
+};

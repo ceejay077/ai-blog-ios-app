@@ -3,7 +3,7 @@ import {
   DefaultTheme,
   ThemeProvider,
 } from "@react-navigation/native";
-import { Stack } from "expo-router";
+import { Stack, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React, { useEffect, useState } from "react";
 import "react-native-reanimated";
@@ -12,21 +12,44 @@ import PreLoader from "@/components/pre-loader";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 
+type AppRoute = "/" | "/select-categories";
+
 export const unstable_settings = {
   anchor: "index",
 };
 
+const CATEGORIES_STORAGE_KEY = "user_selected_categories";
+
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const [isLoading, setIsLoading] = useState(true);
+  const [initialRoute, setInitialRoute] = useState<AppRoute | null>(null);
 
   useEffect(() => {
-    setTimeout(() => {
-      setIsLoading(false);
-    }, 3000); // Show pre-loader for 3 seconds
+    const checkCategoriesAndNavigate = async () => {
+      try {
+        setInitialRoute("/select-categories");
+      } catch (error) {
+        console.error("Failed to load categories from storage:", error);
+        setInitialRoute("/select-categories"); // Fallback to selection page on error
+      } finally {
+        // Simulate pre-loader time, then set loading to false
+        setTimeout(() => {
+          setIsLoading(false);
+        }, 3000);
+      }
+    };
+
+    checkCategoriesAndNavigate();
   }, []);
 
-  if (isLoading) {
+  useEffect(() => {
+    if (!isLoading && initialRoute) {
+      router.replace(initialRoute);
+    }
+  }, [isLoading, initialRoute]);
+
+  if (isLoading || !initialRoute) {
     return <PreLoader />;
   }
 
@@ -34,7 +57,11 @@ export default function RootLayout() {
     <AuthProvider>
       <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
         <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="index" />
+          <Stack.Screen name="index" redirect={initialRoute === "/"} />
+          <Stack.Screen
+            name="select-categories"
+            redirect={initialRoute === "/select-categories"}
+          />
           <Stack.Screen name="(auth)" />
           <Stack.Screen name="(app)" />
         </Stack>
