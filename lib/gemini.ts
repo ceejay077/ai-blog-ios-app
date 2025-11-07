@@ -20,7 +20,7 @@ export const generateSuggestions = async (
 
   try {
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash-latest",
+      model: "gemini-2.5-flash",
     });
 
     const prompt = `Generate 5 ${field} suggestions for a blog post in the "${category}" category.`;
@@ -49,7 +49,7 @@ export const getTrendingTopics = async (category: string) => {
 
   try {
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash-latest",
+      model: "gemini-2.5-flash",
     });
 
     const prompt = `Generate a list of 5 trending topics for blog posts in the "${category}" category. For each topic, provide a catchy title and a brief, one-sentence description. Format the output as a JSON array of objects, where each object has "title" and "description" keys.`;
@@ -88,7 +88,7 @@ export const generateRecommendedTitleGemini = async (
 
   try {
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash-latest", // Or another suitable Gemini model
+      model: "gemini-2.5-flash", // Or another suitable Gemini model
     });
 
     const prompt = `Given the article title "${originalTitle}" and its category "${category}", suggest a more engaging and concise recommended title (max 10 words). Respond with only the new title.`;

@@ -50,7 +50,7 @@ export default function SelectCategoriesScreen() {
         CATEGORIES_STORAGE_KEY,
         JSON.stringify(selectedCategories)
       );
-      router.replace("/"); // Navigate to the main discover page (which is the root tab screen)
+      router.replace("/(app)/create-article"); // Navigate to the create article page
     } catch (error) {
       console.error("Failed to save selected categories:", error);
       // Optionally, show an error message to the user

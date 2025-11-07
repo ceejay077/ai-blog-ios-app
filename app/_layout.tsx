@@ -57,11 +57,7 @@ export default function RootLayout() {
     <AuthProvider>
       <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
         <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="index" redirect={initialRoute === "/"} />
-          <Stack.Screen
-            name="select-categories"
-            redirect={initialRoute === "/select-categories"}
-          />
+          <Stack.Screen name="select-categories" />
           <Stack.Screen name="(auth)" />
           <Stack.Screen name="(app)" />
         </Stack>

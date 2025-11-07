@@ -1,69 +1,26 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { router } from "expo-router";
 import React, { useEffect } from "react";
-import {
-  ActivityIndicator,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { ActivityIndicator, StyleSheet, View } from "react-native";
 
 export default function WelcomeScreen() {
   const { user, loading } = useAuth();
 
   useEffect(() => {
-    if (!loading && user) {
-      // If user is logged in, navigate to main page (tabs)
-      setTimeout(() => router.replace("/(tabs)"), 0);
+    if (!loading) {
+      if (user) {
+        // If user is logged in, navigate to main page (tabs)
+        router.replace("/select-categories");
+      } else {
+        // If user is not logged in, navigate to the login page
+        router.replace("/(auth)/login");
+      }
     }
-  }, [user, loading]);
-
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#007AFF" />
-      </View>
-    );
-  }
+  }, [user, loading, router]);
 
   return (
     <View style={styles.container}>
-      <View style={styles.content}>
-        <View style={styles.logoContainer}>
-          <Text style={styles.logoIcon}>📝</Text>
-          <Text style={styles.logoText}>SEO Article</Text>
-          <Text style={styles.logoTextSecondary}>Generator</Text>
-        </View>
-
-        <Text style={styles.tagline}>
-          Create Professional, SEO-Optimized Blog Articles with AI
-        </Text>
-
-        <View style={styles.features}>
-          <View style={styles.featureItem}>
-            <Text style={styles.featureIcon}>✨</Text>
-            <Text style={styles.featureText}>AI-Powered Content</Text>
-          </View>
-          <View style={styles.featureItem}>
-            <Text style={styles.featureIcon}>🎯</Text>
-            <Text style={styles.featureText}>SEO Optimized</Text>
-          </View>
-          <View style={styles.featureItem}>
-            <Text style={styles.featureIcon}>⚡</Text>
-            <Text style={styles.featureText}>Generate in Seconds</Text>
-          </View>
-        </View>
-
-        <TouchableOpacity
-          style={styles.startButton}
-          onPress={() => router.push("/(auth)/login")}
-        >
-          <Text style={styles.startButtonText}>Get Started</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.footerText}>Powered by Anthropic Claude AI</Text>
-      </View>
+      <ActivityIndicator size="large" color="#007AFF" />
     </View>
   );
 }
